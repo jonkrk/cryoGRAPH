@@ -1,0 +1,53 @@
+[project]
+name = "cryoGRAPH"
+version = "0.1.0"
+requires-python = ">= 3.12, < 3.13"
+dependencies = [
+    "scipy>=1.14.1",
+    "torch-geometric>=2.6.1",
+    "torch>=2.5.1",
+    "lightning>=2.4.0",
+    "jaxtyping>=0.2.34",
+    "wandb>=0.18.7",
+    "mdtraj>=1.10.1",
+    "plotly>=6.0.0",
+    "matplotlib>=3.11.1",
+    "numpy>=1.26.4",
+    "networkx>=3.4.2",
+    "pyyaml>=6.0.2",
+    "torchvision>=0.20.1,<0.21",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.10",
+    "pytest>=8.3.0",
+]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+# jaxtyping shape strings — Float[Tensor, "B N 3"] / Int[Tensor, "B"] — are read
+# by ruff as forward-ref annotations: the space-separated DSL trips F722 and a
+# bare axis name (e.g. "B") trips F821. There is no way to keep jaxtyping's
+# string syntax and these rules together, so both are disabled project-wide,
+# as recommended by jaxtyping's own docs. Use pyright/mypy for name resolution.
+ignore = ["F722", "F821"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test data literals are laid out as visual grids; long lines aid readability.
+"tests/**" = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+xfail_strict = true
+markers = [
+    "slow: exercises the full render / solve path (deselect with -m 'not slow')",
+    "gpu: requires a CUDA device",
+    "needs_data: requires CRYOGRAPH_TEST_DATA to point at a dir with micrographs.pt",
+]

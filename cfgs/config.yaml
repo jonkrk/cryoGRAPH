@@ -1,0 +1,423 @@
+
+# WandB settings.
+wandb:
+    # Wandb project, group and run names.
+    project: cryoGRAPH
+    group: testing
+    run: test_rescaled_projections
+
+    # PATH/TO/FOLDER where WandB checkpoints will be saved.
+    dir: "./../wandb_logging" # Set to an absolute path.
+
+# Training and validation data paths and settings.
+data:
+    # PATH/TO/FOLDER where data files are stored.
+    # Should contain micrographs.pt and a protein structure file.
+    dir: "./../trainingdata/adk4ake" # Set to an absolute path.
+
+    # Filename for relevant protein structure file in data.dir.
+    # Only .pdb for now.
+    structure_file: "fold_with_H_posed.pdb"
+
+    # If True, all relevant data files will be loaded as memorymapped tensors.
+    memory_mapped: True
+
+    # If True, micrographs are standardised to zero mean and unit variance as
+    # they are read. Leave False for data that is already standardised.
+    normalize: False
+
+    # Actual torch.dtype for micrographs.pt (and rots.pt, confs.pt if applicable).
+    dtype: torch.float32  # Resolved to a torch.dtype on load.
+
+    # Choose whether training will make use of known rotations and/or shifts. 
+    # Requires rots.pt or shifts.pt in data.dir. 
+    load_rots: True
+    load_shifts: False # Must be false; shifts are not implemented.
+
+    # Maximum rotation angle (degrees) to perturb known rotations with.
+    noise_max_angle_degrees: 30
+
+    # Choose whether validation will make use of known conformations.
+    # Requires confs.pt in data.dir. 
+    load_confs: True
+
+    # For training with a subset of all data.
+    subset:
+        # If True, training uses a subset of all data.
+        use_data_subset: True
+
+        # Number of datapoints to be used for training/validation.
+        # Subset indices are chosen randomly among all datapoints.
+        size: 5100
+
+        # IMPLEMENT INDEX LIST.
+
+training:
+    # Seed for all RNG.
+    seed: 19
+
+    # Max number of training epochs.
+    max_epochs: 500
+
+    # Torch optimizer class name.
+    optimizer: adam
+
+    # Base learning rate for optimizer.
+    lr: 0.001
+
+    # Learning rate scheduler, initial factor and epochs until annealed.
+    lr_scheduler: linear # linear or cosine
+    lr_initial_factor: 0.1
+    lr_epochs_until_max: 20
+
+    # Batch size for training.
+    batch_size_train: 128
+
+    # Number of dataloader workers for training.
+    num_workers_train: 4
+
+    # Which (GPU) devices to train on.
+    devices: auto # -1 for all, auto for auto-detection.
+
+    # Precision of matmul, highest, high, or medium.
+    precision: highest
+
+validation:
+    # Batch size for validation.
+    batch_size_val: 128
+
+    # Number of dataloader workers for validation.
+    num_workers_val: 4
+
+    # Number of training epochs between validation epochs.
+    check_val_every_n_epoch: 10
+
+    # Choose whether to run a validation epoch before training.
+    do_prevalidation: False
+
+# Loss and regularization parameters.
+regulariser:
+    # Sequential residue distance loss.
+    dist: 
+        # Loss factor.
+        loss_fac: 0.0005
+
+        # Reference distance for distance loss. (Ångström)
+        ref: 3.8 # Should be the template distances, not a constant.
+    
+    # Conformation centering loss
+    cent: 
+        # Loss factor.
+        loss_fac: 0.01
+    
+    # Geometric loss, as defined by Willem Diepeveen.
+    geom:
+        # Loss factor.
+        loss_fac: 0.
+
+    # Local geometric loss, restricting to a neighourhood and with decay
+    local_geom:
+        # Loss factor.
+        loss_fac: 0.
+        # Speed of weight decay
+        decay: 4.
+        # Size of neighbourhood
+        size: 3
+
+# Autoencoder model architecture and hyperparameters.
+network:
+    # Dimension of latent vector.
+    latent_dim: 8
+    
+    # Encoder architecture and hyperparameters.
+    encoder:
+        # Encoder model.
+        model: lookup # lookup or cnn
+
+        # Encoder activation function (if applicable).
+        act_name: relu # relu or tanh 
+
+        cnn:
+            # Convolutional channels across all layers.
+            channels: 32
+    
+    # Decoder architecture and hyperparameters.
+    decoder:
+        # Decoder model.
+        model: gcnconv # mlp, gnn, edge_gnn, egcn, gineconv, gcnconv, sageconv, graphconv, uniconv
+
+        # Decoder activation function.
+        act_name: relu # relu or tanh 
+
+        # Decoder channel dropout frequency
+        dropout: 0.
+
+        # Multilayer perceptron hyperparameters.
+        mlp:
+            # Number of hidden layers.
+            num_layers: 4
+
+            # Width of hidden layers.
+            layer_width: 8
+        
+        # Equivariant graph convolutional network hyperparameters
+        egcn:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 8
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 3
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 8 # In channels implicitly defined
+                  edge_embed_layers: 2
+                  edge_embed_hidden_channels: 8
+                  edge_embed_channels: 8
+                  message_layers: 2
+                  message_hidden_channels: 8
+                  update_layers: 2
+                  update_hidden_channels: 8
+        # Graph neural network with MLP-based message passing.
+        gnn:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 8
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+
+            # Number of GNN message passing layers.
+            messpass_layers: 10
+
+            # Number of linear layers in node update function.
+            aggreg_sublayers: 2
+
+            # Number of linear layers in message passing function.
+            message_sublayers: 2
+        
+        # Graph neural network using GINEconv layers.
+        gineconv:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 8
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+
+            # Dimension of edge embeddings
+            edge_attribute_channels: 8
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 8 # In channels implicitly defined
+                  update_layers: 1
+                  update_hidden_channels: 8
+        
+        gcnconv:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 10
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 10 # In channels implicitly defined
+        
+        sageconv:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 8
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 8 # In channels implicitly defined
+        
+        graphconv:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 8
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 8 # In channels implicitly defined
+
+        edge_gnn:
+            # Dimension of node feature embedding vectors.
+            feature_dim: 8
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+
+            # Dimension of edge embeddings
+            edge_attribute_channels: 4
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 8 # In channels implicitly defined
+                  message_layers: 1
+                  message_hidden_channels: 8
+                  message_channels: 8
+                  update_layers: 1
+                  update_hidden_channels: 8
+        
+        # Unitary Convolutional GNN as designed by Weber and co.
+        uniconv: 
+            # Dimension of node feature embedding vectors.
+            feature_dim: 10
+
+            # Number of embedding layers for latent vector.
+            embed_layers: 1
+            
+            # Number of times to repeat single layer
+            repeat: 10
+            # List of specs for each layer
+            # If repeat>1 only one layer should be specified
+            layer_specs:
+                - node_out_channels: 10 # In channels implicitly defined
+                  residual: True
+                  global_bias: True
+                  T: 10
+                  use_hermitian: False
+
+# Pose loss method.
+# Used if load_rots is False.
+# HAVE NOT IMPLEMENTED SHIFT OPTIMIZATION
+pose_loss:
+    # PATH/TO/FILENAME where the SO(3)-grid is stored. 
+    # Given as rotation matrices or as quaternions.
+    rot_grid_path: "./rotation_grids/rot_grid_1821.pt"
+
+    # Set pose loss optimization method.
+    method: known # known, esl, gradient, mlp_est
+
+    # Ellipsoidal Support Lifting parameters.
+    esl:
+        # Number of centroid clusters for EM projections.
+        cluster_num: 1
+
+        # The eta parameter, as denoted in the ESL paper.
+        eta: 0.6666666
+
+        # Target number (J_0) of SO(3)-points for support of measure.
+        num_pts_base: 15
+
+        # Number of ESL iterations per epoch.
+        num_iters: 10
+    
+    mlp_est:
+        # Number of layers
+        num_layers_mlppose: 4
+
+        # Number of parameters per hidden layer
+        num_hidden_mlppose: 32
+
+        # Name of activation function
+        act_name: relu # relu or tanh
+
+# Simulated EM renderer parameters.
+rendering:
+    # Protein volume potential parameters.
+    volume:
+        # Electron counts per amino residue.
+        amino_electrons:
+            ARG: 85
+            ILE: 62
+            LEU: 62
+            GLY: 30
+            ALA: 38
+            PRO: 52
+            LYS: 71
+            THR: 54
+            GLN: 68
+            PHE: 78
+            MET: 70
+            GLU: 67
+            TYR: 86
+            SER: 46
+            ASP: 59
+            VAL: 54
+            CYS: 54
+            CYX: 54
+            ASN: 60
+            HIS: 72
+            HID: 72
+            TRP: 98
+        
+        # Standard deviation of gaussian blob per amino residue. (Ångström)
+        amino_std:
+            ARG: 2.15
+            ILE: 1.60
+            LEU: 1.65
+            GLY: 1.40
+            ALA: 1.40
+            PRO: 1.50
+            LYS: 1.85
+            THR: 1.55
+            GLN: 1.85
+            PHE: 1.95
+            MET: 1.85
+            GLU: 1.90
+            TYR: 2.10
+            SER: 1.45
+            ASP: 1.70
+            VAL: 1.50
+            CYS: 1.60
+            CYX: 1.60
+            ASN: 1.65
+            HIS: 1.90
+            HID: 1.90
+            TRP: 2.15
+    
+    # EM optical parameters.
+    # Should match training data.
+    optics:
+        # Negative defocus parameter. (Ångström)
+        defocus: 20000.
+
+        # Third order spherical aberration parameter. (mm)
+        spherical_aberration: 2.7
+
+        # Amplitude contrast ratio parameter. 
+        amplitude_contrast_ratio: 0.06
+
+        # Electron energy parameter. (keV)
+        electron_energy: 300.
+
+        # Pixel width for projected images. (Ångström)
+        pixel_width: 1.
+
+    # Simulated image parameters.
+    image:
+        # Choose whether scale and bias of EM renderer projections are learnable.
+        # Otherwise fixed at their initial values throughout training.
+        learn_proj_params: True
+
+        # Initial scale and bias parameters.
+        init_scale: 10.
+        init_bias: -0.1
+    
+        # Image padding for CTF oversampling.
+        # If micrograph resolution is RxR, padding yields (R+2*pad)x(R+2*pad).
+        ctf_pad: 0

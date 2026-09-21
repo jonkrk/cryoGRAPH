@@ -5,7 +5,6 @@ import numpy as np
 from jaxtyping import Float
 from torch import Tensor
 from cryograph.utils import quaternion_rotate
-#OPTIMISE BY PROJECTING OUT THE Z AXIS AT THE START
 
 class CTF(nn.Module):
     """Contrast transfer function of a weak-phase object, applied as a
@@ -122,13 +121,6 @@ class Renderer(nn.Module):
             electron_energy=electron_energy,
         )
 
-        # self.pad_fac = 2
-        # self.register_buffer("zero_image", torch.zeros((1, 1, sidelength, sidelength)))
-        # t = torch.linspace(
-        #     -pixel_width*(sidelength-1)/2, 
-        #     pixel_width*(sidelength-1)/2, 
-        #     sidelength//self.pad_fac,
-        # )
 
         t = torch.linspace(
             -pixel_width*(sidelength-1)/2, 
@@ -184,9 +176,6 @@ class Renderer(nn.Module):
         res = torch.einsum('bqnki, n -> bqnki', res, self.elec_vec_sqrt)
         res = torch.einsum('bqnki, n -> bqnki', res, self.std_fac_div_sqrt)
         out = torch.einsum('bqnk, bqnl -> bqlk', res[..., 0], res[..., 1]) # IMG XY FLIP
-        # tmp = torch.einsum('bqnk, bqnl -> bqlk', res[..., 0], res[..., 1]) # IMG XY FLIP
-        # out = self.zero_image.expand(tmp.shape[0], tmp.shape[1], -1, -1).clone()
-        # out[..., out.shape[2]//2-out.shape[2]//(2*self.pad_fac):out.shape[2]//2+out.shape[2]//(2*self.pad_fac), out.shape[3]//2-out.shape[3]//(2*self.pad_fac):out.shape[3]//2+out.shape[3]//(2*self.pad_fac)] += tmp
         out = self.ctf(out)
         out = (out - self.init_bias) / self.init_scale
         out = (out - self.bias) / self.scale
@@ -196,7 +185,7 @@ class Renderer(nn.Module):
             self,
             confs: Float[Tensor, "B N 3"],
             rotmats: Float[Tensor, "B Q 3 3"],
-            shifts: Float[Tensor, "B Q 2"] | None, # None PLACEHOLDER
+            shifts: Float[Tensor, "B Q 2"] | None, 
         ) -> Float[Tensor, "B Q N 3"]:
         """Rotate a conformation by rotation matrices, then shift in the image plane."""
         posed_confs = torch.einsum('bqij, bnj -> bqni', rotmats, confs)
@@ -208,7 +197,7 @@ class Renderer(nn.Module):
             self,
             confs: Float[Tensor, "B N 3"],
             quats: Float[Tensor, "B Q 4"],
-            shifts: Float[Tensor, "B Q 2"] | None, # None PLACEHOLDER
+            shifts: Float[Tensor, "B Q 2"] | None, 
         ) -> Float[Tensor, "B Q N 3"]:
         """Rotate a conformation by quaternions, then shift in the image plane."""
         posed_confs = quaternion_rotate(quats, confs.unsqueeze(1))
